@@ -56,7 +56,13 @@ RTSPMJPEGClient* RTSPMJPEGClient::_instance = NULL;
 
 static int interrupt_cb(void *pClient)
 {
-    return ((RTSPMJPEGClientStruct * ) pClient)->state == RTSPMJPEGCLIENT_STATE_ABORTING ? 1 : 0;
+    // if av_read_frame takes more than timeout then interrupt it
+    if (((RTSPMJPEGClientStruct * ) pClient)->state == RTSPMJPEGCLIENT_STATE_LOOPING
+        && (clock() - ((RTSPMJPEGClientStruct * ) pClient)->av_frame_read_ticks) / CLOCKS_PER_SEC > RTSPMJPEGCLIENT_AV_FRAME_READ_TIMEOUT)
+        return 1;
+
+    return ((RTSPMJPEGClientStruct * ) pClient)->state == RTSPMJPEGCLIENT_STATE_ABORTING
+        || ((RTSPMJPEGClientStruct * ) pClient)->state == RTSPMJPEGCLIENT_STATE_STOPPING ? 1 : 0;
 }
 
 static const AVIOInterruptCB int_cb = { interrupt_cb, NULL };
@@ -81,9 +87,15 @@ RTSPMJPEGClient* RTSPMJPEGClient::getInstance()
 void RTSPMJPEGClient::_logAVError(RTSPMJPEGClientStruct *pClient, int error)
 {
     if (av_strerror(error, pClient->errbuf, RTSPMJPEGCLIENT_ERRBUF_SIZE) == 0)
+    {
         LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_ERROR_LOGGER)), "[CLIENT " << pClient->clientId << "] LibAV error: " << pClient->errbuf);
+        LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] LibAV error: " << pClient->errbuf);
+    }
     else
+    {
         LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_ERROR_LOGGER)), "[CLIENT " << pClient->clientId << "] LibAV error: Unknown error...");
+        LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] LibAV error: Unknown error...");
+    }
 }
 
 int RTSPMJPEGClient::_init(RTSPMJPEGClientStruct *pClient)
@@ -111,20 +123,35 @@ int RTSPMJPEGClient::_init(RTSPMJPEGClientStruct *pClient)
     int ret = 0;
 
     // open input
-    ret = avformat_open_input(&pClient->_pFormatCtx, pClient->address.c_str(), NULL, NULL);
+    LOG4CPLUS_TRACE(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] avformat_open_input()... ");
+
+    AVDictionary *options = NULL;
+    av_dict_set(&options, "rtsp_transport", "tcp", 0);
+    ret = avformat_open_input(&pClient->_pFormatCtx, pClient->address.c_str(), NULL, &options);
+    av_dict_free(&options);
+
     if (ret < 0)
     {
         LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_ERROR_LOGGER)), "[CLIENT " << pClient->clientId << "] Could not get stream info! ");
+        LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] Could not get stream info! ");
         _logAVError(pClient, ret);
 
         return -1;
     }
 
     // find stream info
+    LOG4CPLUS_TRACE(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] avformat_find_stream_info()... ");
+
+    int64_t max_analyze_duration = pClient->_pFormatCtx->max_analyze_duration;
+
+    pClient->_pFormatCtx->max_analyze_duration = 0;
     ret = avformat_find_stream_info(pClient->_pFormatCtx, NULL);
+    pClient->_pFormatCtx->max_analyze_duration = max_analyze_duration;
+
     if (ret < 0)
     {
         LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_ERROR_LOGGER)), "[CLIENT " << pClient->clientId << "] Could not open address " << pClient->address << "!");
+        LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] Could not open address " << pClient->address << "!");
         _logAVError(pClient, ret);
 
         return - 1;
@@ -146,36 +173,46 @@ int RTSPMJPEGClient::_init(RTSPMJPEGClientStruct *pClient)
     if (pClient->_videoStream == -1)
     {
         LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_ERROR_LOGGER)), "[CLIENT " << pClient->clientId << "] Could not find any MJPEG stream!");
+        LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] Could not find any MJPEG stream!");
         return - 1;
     }
 
     pClient->_pCodecCtxOrig = pClient->_pFormatCtx->streams[pClient->_videoStream]->codec;
+
+    LOG4CPLUS_TRACE(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] avcodec_alloc_context3()... ");
     pClient->_pCodecCtx = avcodec_alloc_context3(NULL);
 
     // find the decoder for the video stream
+    LOG4CPLUS_TRACE(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] avcodec_find_decoder()... ");
     pClient->_pCodec = avcodec_find_decoder(pClient->_pCodecCtxOrig->codec_id);
 
     if (pClient->_pCodec == NULL)
     {
         LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_ERROR_LOGGER)), "[CLIENT " << pClient->clientId << "] Unsupported codec!");
-        return - 1; // Codec not found
+        LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] Unsupported codec!");
+
+        return -1; // codec not found
     }
 
     // copy context
+    LOG4CPLUS_TRACE(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] avcodec_copy_context()... ");
     ret = avcodec_copy_context(pClient->_pCodecCtx, pClient->_pCodecCtxOrig);
     if (ret != 0)
     {
         LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_ERROR_LOGGER)), "[CLIENT " << pClient->clientId << "] Could not copy codec context!");
+        LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] Could not copy codec context!");
         _logAVError(pClient, ret);
 
         return - 1; // error copying codec context
     }
 
     // open codec
+    LOG4CPLUS_TRACE(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] avcodec_open2()... ");
     ret = avcodec_open2(pClient->_pCodecCtx, pClient->_pCodec, NULL);
     if (ret < 0)
     {
         LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_ERROR_LOGGER)), "[CLIENT " << pClient->clientId << "] Could not open codec!");
+        LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] Could not open codec!");
         _logAVError(pClient, ret);
 
         return - 1;
@@ -218,12 +255,21 @@ int RTSPMJPEGClient::_readFrame(RTSPMJPEGClientStruct *pClient)
 {
     int ret = 0;
 
+    LOG4CPLUS_TRACE(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] av_read_frame()...");
+
+    pClient->av_frame_read_ticks = clock();
+
     // is this a packet from the video stream?
     if (av_read_frame(pClient->_pFormatCtx, &pClient->_packet) < 0 || pClient->_packet.stream_index != pClient->_videoStream)
     {
-        LOG4CPLUS_WARN(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] frame read failed or stream not valid!");
-        _logAVError(pClient, ret);
-        _clean(pClient, RTSPMJPEGCLIENT_STATE_ERROR);
+        if (pClient->state == RTSPMJPEGCLIENT_STATE_ABORTING || pClient->state == RTSPMJPEGCLIENT_STATE_STOPPING)
+            LOG4CPLUS_WARN(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] frame not read because STOPPING or ABORTING");
+        else
+        {
+            LOG4CPLUS_WARN(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] frame read failed or stream not valid!");
+            _logAVError(pClient, ret);
+            pClient->state = RTSPMJPEGCLIENT_STATE_ERROR;
+        }
 
         ret = -1;
     } else if (!pClient->isWaiting && pClient->_packet.size <= RTSPMJPEGCLIENT_FRAME_BUFFER_SIZE) {
@@ -271,7 +317,7 @@ void RTSPMJPEGClient::threadLoop(RTSPMJPEGClientParameters *parameters)
         instance->clients[clientId] = pClient;
     }
 
-    pClient->address = parameters->address;
+    pClient->address = ((RTSPMJPEGClientParameters * ) parameters)->address;
 
     delete parameters;
 
@@ -284,7 +330,8 @@ void RTSPMJPEGClient::threadLoop(RTSPMJPEGClientParameters *parameters)
 
     pClient->state = RTSPMJPEGCLIENT_STATE_LOOPING;
 
-    while (pClient->state == RTSPMJPEGCLIENT_STATE_LOOPING && instance->_readFrame(pClient) == 0);
+    while (pClient->state == RTSPMJPEGCLIENT_STATE_LOOPING && instance->_readFrame(pClient) == 0)
+        LOG4CPLUS_DEBUG(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << pClient->clientId << "] while()...");
 
     instance->_clean(pClient, pClient->state == RTSPMJPEGCLIENT_STATE_STOPPING ? RTSPMJPEGCLIENT_STATE_CLEANED : pClient->state);
 }

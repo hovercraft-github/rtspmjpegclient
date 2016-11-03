@@ -22,28 +22,35 @@
 using namespace loghandlerns;
 using namespace rtspmjpegclientns;
 
-QRTAPI void QRTCALL rtspmjpegclient_start_log(const char *outputLogFile, const char *errorLogFile) {
+QRTAPI void QRTCALL rtspmjpegclient_start_log(const char *outputLogFile, const char *errorLogFile)
+{
     LogHandler::startLog(std::string(outputLogFile), std::string(errorLogFile));
 }
 
-QRTAPI void QRTCALL rtspmjpegclient_stop_log() {
+QRTAPI void QRTCALL rtspmjpegclient_stop_log()
+{
     LogHandler::stopLog();
 }
 
-QRTAPI int QRTCALL rtspmjpegclient_get_log_level() {
-    return 0; LogHandler::getLogLevel();
+QRTAPI int QRTCALL rtspmjpegclient_get_log_level()
+{
+    return LogHandler::getLogLevel();
 }
 
-QRTAPI void QRTCALL rtspmjpegclient_set_log_level(int logLevel) {
+QRTAPI void QRTCALL rtspmjpegclient_set_log_level(int logLevel)
+{
     LogHandler::setLogLevel(logLevel);
 }
 
-QRTAPI void QRTCALL rtspmjpegclient_log_state(int clientId) {
+QRTAPI void QRTCALL rtspmjpegclient_log_state(int clientId)
+{
     RTSPMJPEGClient::getInstance()->logState(clientId);
 }
 
-bool check_client(int clientId) {
-    if (clientId < 0 || clientId >= RTSPMJPEGCLIENT_MAX_CLIENT_NUM) {
+bool check_client(int clientId)
+{
+    if (clientId < 0 || clientId >= RTSPMJPEGCLIENT_MAX_CLIENT_NUM)
+    {
         LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_ERROR_LOGGER)), "[CLIENT " << clientId << "] client id NOT valid!");
         return false;
     }
@@ -51,12 +58,13 @@ bool check_client(int clientId) {
     return true;
 }
 
-void startup_thread_loop(RTSPMJPEGClientParameters *parameters) {
+void startup_thread_loop(RTSPMJPEGClientParameters *parameters)
+{
     RTSPMJPEGClient *instance = RTSPMJPEGClient::getInstance();
 
     // wait initialization
     int wait = RTSPMJPEGCLIENT_TIMEOUT;
-    int clientId = parameters->clientId;
+    int clientId = ((RTSPMJPEGClientParameters * ) parameters)->clientId;
 
     // start rtsp thread
     std::thread(RTSPMJPEGClient::threadLoop, parameters).detach();
@@ -65,7 +73,9 @@ void startup_thread_loop(RTSPMJPEGClientParameters *parameters) {
 
     while (wait-- > 0
            && (instance->clients[clientId] == NULL
-           || instance->clients[clientId]->state != RTSPMJPEGCLIENT_STATE_LOOPING)) {
+           || (instance->clients[clientId]->state != RTSPMJPEGCLIENT_STATE_LOOPING
+           && instance->clients[clientId]->state != RTSPMJPEGCLIENT_STATE_ERROR)))
+    {
         if (instance->clients[clientId] != NULL)
             LOG4CPLUS_DEBUG(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << clientId << "] STATE = " << state_to_string(instance->clients[clientId]->state));
 
@@ -75,10 +85,12 @@ void startup_thread_loop(RTSPMJPEGClientParameters *parameters) {
 
     // if not initialized quit
     if (instance->clients[clientId] == NULL
-        || instance->clients[clientId]->state != RTSPMJPEGCLIENT_STATE_LOOPING) {
+        || instance->clients[clientId]->state != RTSPMJPEGCLIENT_STATE_LOOPING)
+    {
         LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_ERROR_LOGGER)), "[CLIENT " << clientId << "] rtsp thread not looping... something has gone wrong :(");
 
-        if (instance->clients[clientId] != NULL && instance->clients[clientId]->state > RTSPMJPEGCLIENT_STATE_CLEANED) {
+        if (instance->clients[clientId] != NULL && instance->clients[clientId]->state > RTSPMJPEGCLIENT_STATE_CLEANED)
+        {
             instance->abort(clientId);
 
             wait = RTSPMJPEGCLIENT_TIMEOUT;
@@ -91,8 +103,10 @@ void startup_thread_loop(RTSPMJPEGClientParameters *parameters) {
     }
 }
 
-QRTAPI int QRTCALL rtspmjpegclient_start(int clientId, const char *address, int asyncCall) {
-    if (address == NULL) {
+QRTAPI int QRTCALL rtspmjpegclient_start(int clientId, const char *address, int asyncCall)
+{
+    if (address == NULL)
+    {
         LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_ERROR_LOGGER)), "[CLIENT " << clientId << "] address is empty!");
         return -1;
     }
@@ -104,7 +118,8 @@ QRTAPI int QRTCALL rtspmjpegclient_start(int clientId, const char *address, int 
     parameters->clientId = clientId;
     parameters->address = address;
 
-    if (asyncCall == 1) {
+    if (asyncCall == 1)
+    {
         // starts a startup thread to avoid
         std::thread(startup_thread_loop, parameters).detach();
         std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -115,21 +130,24 @@ QRTAPI int QRTCALL rtspmjpegclient_start(int clientId, const char *address, int 
     return 0;
 }
 
-QRTAPI int QRTCALL rtspmjpegclient_wait(int clientId) {
+QRTAPI int QRTCALL rtspmjpegclient_wait(int clientId)
+{
     if (!check_client(clientId))
         return -1;
 
     return RTSPMJPEGClient::getInstance()->wait(clientId);
 }
 
-QRTAPI int QRTCALL rtspmjpegclient_resume(int clientId) {
+QRTAPI int QRTCALL rtspmjpegclient_resume(int clientId)
+{
     if (!check_client(clientId))
         return -1;
 
     return RTSPMJPEGClient::getInstance()->resume(clientId);
 }
 
-QRTAPI int QRTCALL rtspmjpegclient_stop(int clientId) {
+QRTAPI int QRTCALL rtspmjpegclient_stop(int clientId)
+{
     if (!check_client(clientId))
         return -1;
 
@@ -158,7 +176,8 @@ QRTAPI int QRTCALL rtspmjpegclient_stop(int clientId) {
     return pClient->state > RTSPMJPEGCLIENT_STATE_CLEANED ? -1 : 0;
 }
 
-QRTAPI int QRTCALL rtspmjpegclient_destroy(int clientId) {
+QRTAPI int QRTCALL rtspmjpegclient_destroy(int clientId)
+{
     if (!check_client(clientId))
         return -1;
 
@@ -171,7 +190,8 @@ QRTAPI int QRTCALL rtspmjpegclient_destroy(int clientId) {
     return instance->destroy(clientId);
 }
 
-QRTAPI int QRTCALL rtspmjpegclient_get_data(int clientId, int frames, int fps, RTSPMJPEGClientData *data) {
+QRTAPI int QRTCALL rtspmjpegclient_get_data(int clientId, int frames, int fps, RTSPMJPEGClientData *data)
+{
     if (!check_client(clientId))
         return -1;
 
@@ -195,11 +215,12 @@ QRTAPI int QRTCALL rtspmjpegclient_get_data(int clientId, int frames, int fps, R
     int step = 1;
 
     if (fps > 0)
-        step = (int)std::max(ceil((double)frames / (double)fps), 1.0);
+        step = (int ) std::max(ceil((double ) frames / (double ) fps), 1.0);
 
     data->framesRead = 0;
 
-    for (int i = 0; i * step < frames; i++) {
+    for (int i = 0; i * step < frames; i++)
+    {
         std::memcpy((char *)&data->frameQueue[i * RTSPMJPEGCLIENT_FRAME_BUFFER_SIZE], (char *)pClient->frameQueue[(cur + i * step) % RTSPMJPEGCLIENT_FRAME_QUEUE_LEN], pClient->frameSizes[(cur + i * step) % RTSPMJPEGCLIENT_FRAME_QUEUE_LEN]);
         data->frameSizes[i] = pClient->frameSizes[(cur + i * step) % RTSPMJPEGCLIENT_FRAME_QUEUE_LEN];
         data->framesRead++;
@@ -210,7 +231,8 @@ QRTAPI int QRTCALL rtspmjpegclient_get_data(int clientId, int frames, int fps, R
     return 0;
 }
 
-QRTAPI int QRTCALL rtspmjpegclient_get_state(int clientId) {
+QRTAPI int QRTCALL rtspmjpegclient_get_state(int clientId)
+{
     if (!check_client(clientId))
         return -1;
 

@@ -41,7 +41,8 @@ extern "C"
 {
 #endif
 
-    struct _RTSPMJPEGClientData {
+    struct _RTSPMJPEGClientData
+    {
         int clientId;
         int state;
         int isWaiting;

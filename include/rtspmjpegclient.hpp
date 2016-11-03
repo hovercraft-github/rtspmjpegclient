@@ -18,6 +18,7 @@
 #define RTSPMJPEGCLIENT_HPP
 
 #include <string>
+#include <ctime>
 #include "rtspmjpegclient_common.hpp"
 
 #ifdef __cplusplus
@@ -36,7 +37,8 @@ namespace rtspmjpegclientns {
     const char *state_to_string(int state);
 
     // input
-    struct _RTSPMJPEGClientParameters {
+    struct _RTSPMJPEGClientParameters
+    {
         const char *address;
         int clientId;
     };
@@ -44,7 +46,8 @@ namespace rtspmjpegclientns {
     typedef struct _RTSPMJPEGClientParameters RTSPMJPEGClientParameters;
 
     // struct
-    struct _RTSPMJPEGClientStruct {
+    struct _RTSPMJPEGClientStruct
+    {
         // private
         AVFormatContext *_pFormatCtx;
         AVCodecContext *_pCodecCtxOrig;
@@ -65,11 +68,14 @@ namespace rtspmjpegclientns {
         int next;
         uint8_t *frameQueue[RTSPMJPEGCLIENT_FRAME_QUEUE_LEN];
         int frameSizes[RTSPMJPEGCLIENT_FRAME_QUEUE_LEN];
+
+        clock_t av_frame_read_ticks;
     };
 
     typedef struct _RTSPMJPEGClientStruct RTSPMJPEGClientStruct;
 
-    class RTSPMJPEGClient {
+    class RTSPMJPEGClient
+    {
     private:
         static RTSPMJPEGClient *_instance;
 

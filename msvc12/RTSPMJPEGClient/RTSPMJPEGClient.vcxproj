@@ -59,13 +59,13 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>false</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\include;..\..\..\libs\log4cplus\log4cplus-1.2.0.vs2013\include;..\..\..\libs\ffmpeg\win32\dev\include;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\include;..\..\..\..\libs\log4cplus\log4cplus-1.2.0.vs2013\include;..\..\..\..\libs\ffmpeg\win32\dev\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>..\..\..\libs\log4cplus\log4cplus-1.2.0.vs2013\msvc10\Win32\bin.Release;..\..\..\libs\ffmpeg\win32\dev\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\..\..\libs\log4cplus\log4cplus-1.2.0.vs2013\msvc10\Win32\bin.Release;..\..\..\..\libs\ffmpeg\win32\dev\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>log4cplus.lib;avcodec.lib;avformat.lib;avutil.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
     </Link>
