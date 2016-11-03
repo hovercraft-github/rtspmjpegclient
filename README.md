@@ -52,7 +52,7 @@ to completely delete a client object and free memory.
 
 States
 ------
-From rtspclient_common.h:
+From rtspmjpegclient_common.hpp:
 
  * RTSPMJPEGCLIENT_STATE_ERROR -1
  * RTSPMJPEGCLIENT_STATE_EMPTY 0
