@@ -226,7 +226,7 @@ namespace rtspclientlibtestwinform
 
                     ConnectButton.Text = "Connect";
 
-                    _logger.Info("disconnect... DONE");
+                    _logger.Info("disconnecting... DONE");
                 }
             }
             catch (Exception ex)
@@ -259,7 +259,7 @@ namespace rtspclientlibtestwinform
                     && state <= Interoperability.RTSPMJPEGCLIENT_STATE_STOPPING)
                     return;
 
-                if (state != Interoperability.RTSPMJPEGCLIENT_STATE_LOOPING)
+                if (state < Interoperability.RTSPMJPEGCLIENT_STATE_INITIALIZING)
                 {
                     GrabTimer.Enabled = false;
 

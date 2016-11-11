@@ -88,6 +88,7 @@ void startup_thread_loop(RTSPMJPEGClientParameters *parameters)
         || instance->clients[clientId]->state != RTSPMJPEGCLIENT_STATE_LOOPING)
     {
         LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_ERROR_LOGGER)), "[CLIENT " << clientId << "] rtsp thread not looping... something has gone wrong :(");
+        LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << clientId << "] rtsp thread not looping... something has gone wrong :(");
 
         if (instance->clients[clientId] != NULL && instance->clients[clientId]->state > RTSPMJPEGCLIENT_STATE_CLEANED)
         {
@@ -96,9 +97,15 @@ void startup_thread_loop(RTSPMJPEGClientParameters *parameters)
             wait = RTSPMJPEGCLIENT_TIMEOUT;
 
             LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_ERROR_LOGGER)), "[CLIENT " << clientId << "] aborting...");
+            LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << clientId << "] aborting...");
 
             while (wait-- > 0 && instance->clients[clientId]->state == RTSPMJPEGCLIENT_STATE_ABORTING)
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));;
+            {
+                LOG4CPLUS_DEBUG(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << clientId << "] STATE = " << state_to_string(instance->clients[clientId]->state));
+                LOG4CPLUS_TRACE(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << clientId << "] wait = " << wait);
+
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            }
         }
     }
 }
@@ -108,19 +115,31 @@ QRTAPI int QRTCALL rtspmjpegclient_start(int clientId, const char *address, int 
     if (address == NULL)
     {
         LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_ERROR_LOGGER)), "[CLIENT " << clientId << "] address is empty!");
+        LOG4CPLUS_ERROR(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << clientId << "] address is empty!");
+
         return -1;
     }
 
     if (!check_client(clientId))
         return -1;
 
+    // check that the client is not already started and is not doing anything
+    if (RTSPMJPEGClient::getInstance()->clients[clientId] != NULL && RTSPMJPEGClient::getInstance()->clients[clientId]->state > RTSPMJPEGCLIENT_STATE_CLEANED)
+    {
+        LOG4CPLUS_WARN(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << clientId << "] client already started.");
+
+        return 0;
+    }
+
     RTSPMJPEGClientParameters *parameters = new RTSPMJPEGClientParameters;
     parameters->clientId = clientId;
     parameters->address = address;
 
+    LOG4CPLUS_DEBUG(Logger::getInstance(LOG4CPLUS_TEXT(DEFAULT_OUTPUT_LOGGER)), "[CLIENT " << clientId << "] starting " << (asyncCall == 1 ? "asynchronously" : "synchronously") << "...");
+
     if (asyncCall == 1)
     {
-        // starts a startup thread to avoid
+        // start a startup thread
         std::thread(startup_thread_loop, parameters).detach();
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
@@ -221,7 +240,7 @@ QRTAPI int QRTCALL rtspmjpegclient_get_data(int clientId, int frames, int fps, R
 
     for (int i = 0; i * step < frames; i++)
     {
-        std::memcpy((char *)&data->frameQueue[i * RTSPMJPEGCLIENT_FRAME_BUFFER_SIZE], (char *)pClient->frameQueue[(cur + i * step) % RTSPMJPEGCLIENT_FRAME_QUEUE_LEN], pClient->frameSizes[(cur + i * step) % RTSPMJPEGCLIENT_FRAME_QUEUE_LEN]);
+        std::memcpy((char * ) &data->frameQueue[i * RTSPMJPEGCLIENT_FRAME_BUFFER_SIZE], (char * ) pClient->frameQueue[(cur + i * step) % RTSPMJPEGCLIENT_FRAME_QUEUE_LEN], pClient->frameSizes[(cur + i * step) % RTSPMJPEGCLIENT_FRAME_QUEUE_LEN]);
         data->frameSizes[i] = pClient->frameSizes[(cur + i * step) % RTSPMJPEGCLIENT_FRAME_QUEUE_LEN];
         data->framesRead++;
     }
