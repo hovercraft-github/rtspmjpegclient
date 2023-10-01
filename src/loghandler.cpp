@@ -38,13 +38,13 @@ void LogHandler::startLog(std::string outputLogFile = "", std::string errorLogFi
 
     SharedAppenderPtr stdoutAppender(new log4cplus::ConsoleAppender(false, DEFAULT_IMMEDIATE_FLUSH));
     stdoutAppender->setName("stdoutAppender");
-    std::auto_ptr<Layout> stdoutLayout = std::auto_ptr<Layout>(new log4cplus::PatternLayout(DEFAULT_LOG_PATTERN_LAYOUT));
-    stdoutAppender->setLayout(stdoutLayout);
+    //std::unique_ptr<Layout> stdoutLayout = std::unique_ptr<Layout>(new log4cplus::PatternLayout(DEFAULT_LOG_PATTERN_LAYOUT));
+    stdoutAppender->setLayout(std::unique_ptr<Layout>(new log4cplus::PatternLayout(DEFAULT_LOG_PATTERN_LAYOUT)));
 
     SharedAppenderPtr outputFileAppender(new RollingFileAppender(outputLogFile, MAX_LOG_FILE_SIZE, MAX_LOG_BACKUP_INDEX, DEFAULT_IMMEDIATE_FLUSH));
     outputFileAppender->setName("outputFileAppender");
-    std::auto_ptr<Layout> outputFileLayout = std::auto_ptr<Layout>(new log4cplus::PatternLayout(DEFAULT_LOG_PATTERN_LAYOUT));
-    outputFileAppender->setLayout(outputFileLayout);
+    //std::unique_ptr<Layout> outputFileLayout = std::unique_ptr<Layout>(new log4cplus::PatternLayout(DEFAULT_LOG_PATTERN_LAYOUT));
+    outputFileAppender->setLayout(std::unique_ptr<Layout>(new log4cplus::PatternLayout(DEFAULT_LOG_PATTERN_LAYOUT)));
 
     outputLogger.addAppender(stdoutAppender);
     outputLogger.addAppender(outputFileAppender);
@@ -55,13 +55,13 @@ void LogHandler::startLog(std::string outputLogFile = "", std::string errorLogFi
 
     SharedAppenderPtr stderrAppender(new log4cplus::ConsoleAppender(true, DEFAULT_IMMEDIATE_FLUSH));
     stderrAppender->setName("stderrAppender");
-    std::auto_ptr<Layout> stderrLayout = std::auto_ptr<Layout>(new log4cplus::PatternLayout(DEFAULT_LOG_PATTERN_LAYOUT));
-    stderrAppender->setLayout(stderrLayout);
+    //std::unique_ptr<Layout> stderrLayout = std::unique_ptr<Layout>(new log4cplus::PatternLayout(DEFAULT_LOG_PATTERN_LAYOUT));
+    stderrAppender->setLayout(std::unique_ptr<Layout>(new log4cplus::PatternLayout(DEFAULT_LOG_PATTERN_LAYOUT)));
 
     SharedAppenderPtr errorFileAppender(new RollingFileAppender(errorLogFile, MAX_LOG_FILE_SIZE, MAX_LOG_BACKUP_INDEX, DEFAULT_IMMEDIATE_FLUSH));
     errorFileAppender->setName("errorFileAppender");
-    std::auto_ptr<Layout> errorFileLayout = std::auto_ptr<Layout>(new log4cplus::PatternLayout(DEFAULT_LOG_PATTERN_LAYOUT));
-    errorFileAppender->setLayout(errorFileLayout);
+    //std::unique_ptr<Layout> errorFileLayout = std::unique_ptr<Layout>(new log4cplus::PatternLayout(DEFAULT_LOG_PATTERN_LAYOUT));
+    errorFileAppender->setLayout(std::unique_ptr<Layout>(new log4cplus::PatternLayout(DEFAULT_LOG_PATTERN_LAYOUT)));
 
     errorLogger.addAppender(stderrAppender);
     errorLogger.addAppender(errorFileAppender);

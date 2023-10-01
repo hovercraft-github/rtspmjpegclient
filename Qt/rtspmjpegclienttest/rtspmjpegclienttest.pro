@@ -10,5 +10,5 @@ SOURCES += ../../src/main.cpp
 
 unix {
     INCLUDEPATH += ../../include
-    LIBS += -L../build-rtspmjpegclient-Desktop-Debug -lrtspmjpegclient
+    LIBS += -L../build-rtspmjpegclient-x64-Debug -lrtspmjpegclient
 }
